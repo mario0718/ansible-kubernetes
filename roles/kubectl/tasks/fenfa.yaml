@@ -1,0 +1,10 @@
+---
+- name: 在所有节点上创建kube目录
+  file:
+    path: /root/.kube
+    state: directory
+- name: 在所有节点上分发身份认证文件
+  copy:
+    src: /opt/kubernetes/cfg/kubectl.kubeconfig
+    dest: /root/.kube/config
+    mode: 0755

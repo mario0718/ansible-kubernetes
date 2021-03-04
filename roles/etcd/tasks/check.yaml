@@ -1,0 +1,8 @@
+---
+- name: etcd健康检查
+  shell: |
+    ETCDCTL_API=3 etcdctl --endpoints={{ ETCD_ENDPOINTS }} --cacert=/opt/kubernetes/ssl/ca.pem --cert=/opt/kubernetes/ssl/etcd.pem --key=/opt/kubernetes/ssl/etcd-key.pem -w table endpoint status
+  register: result
+- debug:
+    var: result.stdout_lines
+    verbosity: 0

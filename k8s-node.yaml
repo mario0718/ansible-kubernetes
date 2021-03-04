@@ -1,0 +1,6 @@
+---
+- hosts: k8s-node
+  remote_user: root
+  gather_facts: yes
+  roles:
+    - k8s-node

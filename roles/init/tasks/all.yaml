@@ -1,0 +1,176 @@
+- name: 修改主机名 
+  shell: hostnamectl set-hostname {{ inventory_hostname }}
+  when: ansible_distribution_major_version == "7"    
+- name: "修改hosts文件"
+  shell: echo "{{ item.ip }}  {{ item.host }}" >>/etc/hosts
+  with_items:
+    - { ip: "{{ MASTER01_IP }}", host: "{{ MASTER01_HOSTNAME }}" }  
+    - { ip: "{{ MASTER02_IP }}", host: "{{ MASTER02_HOSTNAME }}" }  
+    - { ip: "{{ MASTER03_IP }}", host: "{{ MASTER03_HOSTNAME }}" }    
+  register: result
+- debug: var=result
+- name: 增加vip地址域名映射
+  shell: echo "127.0.0.1  server.k8s.master" >>/etc/hosts
+  register: result
+- debug: var=result  
+- name: 修改root密码
+  user: name={{ item.user }} password={{ item.password | password_hash('sha512') }} update_password=always
+  with_items:
+    - { user: 'root', password: 'hundun@123.' }
+
+- name: 关闭防火墙,NetworkManager,dnsmasq
+  systemd:
+    name: "{{ item }}"
+    enabled: no
+    state: stopped
+  with_items:
+    - firewalld
+  ignore_errors: True
+- name: CentOS7_base
+  yum_repository:
+    name: base
+    baseurl: https://mirrors.aliyun.com/centos/7/os/x86_64/
+    enabled: yes
+    gpgcheck: no
+    mode: 0644
+    file: base
+    description: base
+    state: present
+  when:
+    - ansible_facts["distribution"] == "CentOS"
+    - ansible_facts["distribution_major_version"] == "7"
+
+- name: CentOS7_epel
+  yum_repository:
+    name: epel
+    description: EPEL YUM repo
+    file: epel
+    baseurl: https://mirrors.aliyun.com/epel/7/x86_64
+    gpgcheck: no
+    mode: 0644
+    state: present
+  when:
+    - ansible_facts["distribution"] == "CentOS"
+    - ansible_facts["distribution_major_version"] == "7"
+
+- name: yum_RedHat8 yum_CentOS8
+  loop:
+    - AppStream
+    - BaseOS
+  yum_repository:
+    name: "{{ item }}"
+    description: "{{ item }}"
+    file: "{{ item }}"
+    baseurl: https://mirrors.aliyun.com/centos/8/{{ item }}/x86_64/os/
+    gpgcheck: no
+    mode: 0644
+    state: present
+  when: >
+    ( ansible_facts["distribution"] == "RedHat" and
+      ansible_facts["distribution_major_version"] == "8" )
+     or
+    ( ansible_facts["distribution"] == "CentOS" and
+      ansible_facts["distribution_major_version"] == "8" )
+
+- name: epel_RedHat8 epel_CentOS8
+  yum_repository:
+    name: epel
+    description: EPEL YUM repo
+    file: epel
+    baseurl: https://mirrors.aliyun.com/epel/8/Modular/x86_64//
+    gpgcheck: no
+    mode: 0644
+    state: present
+  when: >
+    ( ansible_facts["distribution"] == "RedHat" and
+      ansible_facts["distribution_major_version"] == "8" )
+     or
+    ( ansible_facts["distribution"] == "CentOS" and
+      ansible_facts["distribution_major_version"] == "8" )    
+- name: 卸载系统自带的邮件服务
+  systemd: name=postfix state=stopped enabled=no
+- name: 优化中断分配    
+  yum: name=irqbalance state=present
+- name: 服务启动irqbalance
+  systemd: name=irqbalance state=restarted  enabled=yes
+  
+- name: 永久关闭 selinux
+  lineinfile:
+    dest: /etc/selinux/config
+    regexp: "^SELINUX="
+    line: "SELINUX=disabled"
+
+- name: 临时关闭 selinux
+  shell: "setenforce 0"
+  failed_when: false
+
+- name: 临时关闭swap
+  shell: "swapoff -a"
+    
+- name: 分发sysctl的conf
+  copy:
+    src: files/{{ item.src }}
+    dest: "{{ item.dest }}"
+  with_items:
+    - { src: 'kubernetes.conf', dest: "/etc/security/limits.d/" }
+    - { src: '20-nproc.conf', dest: "/etc/security/limits.d/" }
+- name: 优化系统参数
+  copy:
+    src: files/k8s.sh  
+    dest: /etc/profile.d/
+- name: 分发sysctl文件
+  template:
+    src: k8s-all-sysctl.conf.j2
+    dest: /etc/sysctl.d/k8s-sysctl.conf
+        
+- name: 设置系统时区
+  timezone:
+    name: "Asia/Shanghai"
+  when: TimeZone is defined
+
+- name: prepare some dirs
+  file: name={{ item }} state=directory
+  with_items:
+   - /opt/kubernetes
+   - /opt/kubernetes/bin
+   - /opt/kubernetes/cfg
+   - /opt/kubernetes/ssl
+   - /opt/kubernetes/log   
+   - /opt/kubernetes/etcd
+   - /opt/kubernetes/docker
+- name: "判断/opt/kubernetes/bin目录是否存在"
+  shell: ls /opt/kubernetes/bin
+  ignore_errors: True
+  register: result      
+- name: "加载环境变量"
+  shell: echo 'export PATH=/opt/kubernetes/bin:$PATH' >> /etc/profile.d/k8s.sh && source /etc/profile.d/k8s.sh
+  when: result.rc == 0
+- name: 判断是否安装ntp
+  shell: rpm -qa|grep '^ntp' &>/dev/null
+  ignore_errors: True
+  register: res
+- name: "安装ntp服务"
+  yum: 
+    name: "ntp"
+    state: latest
+  when: res.rc != 0
+- name: 分发配置文件
+  copy: 
+    src: files/ntp.conf  
+    dest: /etc/ntp.conf
+    mode: 0755
+- name: "启动ntpd并设置开机启动"
+  systemd: 
+    name: ntpd 
+    state: restarted
+    enabled: yes
+- name: "时钟同步"
+  shell: ntpq -p && hwclock -w
+    
+- name: Reboot host
+  shell: sleep 3 && shutdown -r now "reboot"
+  async: 1
+  poll: 0
+  ignore_errors: yes
+  tags:
+    - reboot

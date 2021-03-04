@@ -1,0 +1,6 @@
+---
+- hosts: k8s-master
+  remote_user: root
+  gather_facts: yes
+  roles:
+    - kube-controller-manager 

@@ -1,0 +1,27 @@
+user  www www;
+worker_processes  auto;
+worker_cpu_affinity auto;
+error_log  logs/error.log info;
+pid  logs/nginx.pid;
+worker_rlimit_nofile 102400;
+events{
+     use epoll;
+     multi_accept on;
+     worker_connections 102400;
+}
+
+    stream {
+upstream kube-apiservers {
+    hash $remote_addr consistent;
+    server {{ MASTER01_HOSTNAME }}:6443 weight=5 max_fails=1 fail_timeout=15s;
+    server {{ MASTER02_HOSTNAME }}:6443 weight=5 max_fails=1 fail_timeout=15s;
+    server {{ MASTER03_HOSTNAME }}:6443 weight=5 max_fails=1 fail_timeout=15s;
+      }
+    server {
+       listen 8443 backlog=8192;
+       proxy_timeout 10s;
+       proxy_pass kube-apiservers;
+       proxy_connect_timeout    10s;
+       proxy_buffer_size        16k;
+       }
+    }

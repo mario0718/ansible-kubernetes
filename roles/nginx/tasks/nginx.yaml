@@ -1,0 +1,63 @@
+---
+- name: yum安装nginx依赖
+  yum: 
+    name: "{{ item }}" 
+    state: latest
+  loop:
+    - gcc
+    - gcc-c++
+    - autoconf
+    - openssl
+    - openssl-devel
+    - make
+    - perl
+    - perl-devel
+- name: 创建www用户组
+  group:
+    name: www
+    state: present
+- name: 创建www用户
+  user:
+    name: www
+    group: www
+    shell: '/sbin/nologin'
+    createhome: no 
+- name: 解压nginx-1.12.2.tar.gz
+  unarchive:
+    src: files/nginx-1.12.2.tar.gz
+    dest: /usr/local/src/
+- name: 编译nginx
+  shell: |
+    cd /usr/local/src/nginx-1.12.2;./configure --user=www --group=www --with-threads --with-file-aio --prefix=/usr/local/nginx --with-http_stub_status_module --with-http_ssl_module --with-stream --with-stream_ssl_module;make && make install
+- name: nginx配置文件
+  template:
+    src: nginx.conf.j2 
+    dest: /usr/local/nginx/conf/nginx.conf
+    mode: 0755
+- name: 日志目录映射到/var/log目录下
+  file:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    state: link
+  with_items:
+    - { src: '/usr/local/nginx/sbin/nginx',dest: '/usr/bin/nginx' }
+    - { src: '/usr/local/nginx/logs',dest: '/var/log/nginx' }
+- name: 设置目录权限
+  file:
+    dest: /usr/local/nginx
+    mode: 0755
+    owner: www
+    group: www
+    recurse: yes
+- name: 分发nginx.service文件
+  copy: 
+    src: files/nginx.service
+    dest: /usr/lib/systemd/system/
+    mode: 0755
+- name: 启动nginx服务
+  systemd:
+    name: nginx
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+

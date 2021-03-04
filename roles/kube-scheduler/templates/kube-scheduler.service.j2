@@ -1,0 +1,19 @@
+[Unit]
+Description=Kubernetes Scheduler
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+WorkingDirectory={{ K8S_DIR }}/kube-scheduler
+ExecStart=/opt/kubernetes/bin/kube-scheduler \
+  --config=/opt/kubernetes/cfg/kube-scheduler.yaml \
+  --address=127.0.0.1 \
+  --kube-api-qps=100 \
+  --logtostderr=true \
+  --log-dir=/opt/kubernetes/kube-scheduler/kube-scheduler.log \
+  --v=2
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,4 @@
+- include: kubectl.yaml
+- { include: kubeconfig.yaml, when: inventory_hostname == 'k8s-master01' }
+- include: fenfa.yaml
+- include: clean.yaml

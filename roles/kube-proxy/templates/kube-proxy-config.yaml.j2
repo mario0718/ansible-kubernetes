@@ -1,0 +1,10 @@
+kind: KubeProxyConfiguration
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+clientConnection:
+  kubeconfig: "{{ K8S_DIR }}/cfg/kube-proxy.kubeconfig"
+bindAddress: {{ ansible_default_ipv4['address'] }}
+clusterCIDR: {{ CLUSTER_CIDR }}
+healthzBindAddress: {{ ansible_default_ipv4['address'] }}:10256
+hostnameOverride: {{ inventory_hostname }}
+metricsBindAddress: {{ ansible_default_ipv4['address'] }}:10249
+mode: "ipvs"

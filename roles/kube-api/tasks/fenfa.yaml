@@ -1,0 +1,14 @@
+---
+- name: 创建数据目录
+  file:
+    path: "{{ K8S_DIR }}/kube-apiserver"
+    state: directory
+- name: 分发配置文件
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: 0755
+  with_items:
+    - { src: "templates/encryption-config.yaml.j2", dest: "/opt/kubernetes/kube-apiserver/encryption-config.yaml" }
+    - { src: "templates/kube-apiserver.service.j2", dest: "/usr/lib/systemd/system/kube-apiserver.service" }
+

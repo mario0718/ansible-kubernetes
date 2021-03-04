@@ -1,0 +1,5 @@
+---
+- name: 自动 approve CSR 请求
+  shell: |
+    kubectl apply -f  /opt/kubernetes/cfg/csr-crb.yaml
+  when: inventory_hostname == "k8s-node01"

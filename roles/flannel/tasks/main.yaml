@@ -1,0 +1,3 @@
+- include: fenfa.yaml
+- include: flanneld.yaml
+- include: clean.yaml

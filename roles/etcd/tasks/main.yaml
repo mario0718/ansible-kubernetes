@@ -1,0 +1,4 @@
+- include: fenfa.yaml 
+- include: start.yaml
+- include: check.yaml
+- include: clean.yaml

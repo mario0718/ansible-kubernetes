@@ -1,0 +1,15 @@
+---
+- name: 列出/usr/local/src/下文件
+  shell: ls
+  args:
+    chdir: "{{ item }}"
+  ignore_errors: true
+  register: files_to_delete
+  with_items:
+    - '/usr/local/src'
+- name: 清除/usr/local/src下安装文件
+  file:
+    path: "/usr/local/src/{{ item }}"
+    state: absent
+    force: yes
+  with_items: "{{ files_to_delete.results[0].stdout_lines }}"

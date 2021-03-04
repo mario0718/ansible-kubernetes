@@ -1,0 +1,31 @@
+# [member]
+# 由于etcd_name变量比较特殊，需要和ETCD_INITIAL_CLUSTER中的值一一对应，暂时写为etcd1,配置下发后需要将该值替换成对应节点的名称
+ETCD_NAME="{{ inventory_hostname }}"
+ETCD_DATA_DIR="/opt/kubernetes/etcd/default.etcd"
+ETCD_LISTEN_PEER_URLS="https://{{ ansible_default_ipv4.address }}:2380"
+ETCD_LISTEN_CLIENT_URLS="https://{{ ansible_default_ipv4.address }}:2379,https://127.0.0.1:2379"
+
+#[cluster]
+ETCD_INITIAL_ADVERTISE_PEER_URLS="https://{{ ansible_default_ipv4.address }}:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster"
+ETCD_ADVERTISE_CLIENT_URLS="https://{{ ansible_default_ipv4.address }}:2379"
+ETCD_INITIAL_CLUSTER="{{ ETCD_URL }}"
+ETCD_INITIAL_CLUSTER_STATE="new"
+ETCD_INITIAL_CLUSTER_TOKEN="k8s-etcd-cluster"
+ETCD_ADVERTISE_CLIENT_URLS=https://{{ ansible_default_ipv4.address }}:2379
+ETCD_SNAPSHOT_COUNT=5000
+ETCD_HEARTBEAT_INTERVAL=250
+ETCD_ELECTION_TIMEOUT=2000
+ETCD_AUTO_COMPACTION_RETENTION=1
+ETCD_MAX_REQUEST_BYTES=10485760
+ETCD_QUOTA_BACKEND_BYTES=8589934592
+#[security]
+CLIENT_CERT_AUTH="true"
+ETCD_CA_FILE="/opt/kubernetes/ssl/ca.pem"
+ETCD_CERT_FILE="/opt/kubernetes/ssl/etcd.pem"
+ETCD_KEY_FILE="/opt/kubernetes/ssl/etcd-key.pem"
+PEER_CLIENT_CERT_AUTH="true"
+ETCD_PEER_CA_FILE="/opt/kubernetes/ssl/ca.pem"
+ETCD_PEER_CERT_FILE="/opt/kubernetes/ssl/etcd.pem"
+ETCD_PEER_KEY_FILE="/opt/kubernetes/ssl/etcd-key.pem"
+

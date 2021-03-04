@@ -1,0 +1,100 @@
+---
+- name: 获取当前主机名
+  shell: echo $HOSTNAME
+  register: hostname
+- name: 在{{ inventory_hostname }}创建SSL临时目录
+  file:
+    path: /usr/local/src
+    state: directory
+    owner: root
+    group: root
+    mode: 0775
+  when: ( hostname.stdout == 'k8s-master01' )    
+- name: 在{{ inventory_hostname }}渲染 create-ca.sh 模板 
+  template: 
+    src:  create-ca.sh.j2
+    dest: /usr/local/src/create-ca.sh
+    mode: 0755
+  when: ( hostname.stdout == 'k8s-master01' )    
+- name: 在{{ inventory_hostname }}安装cfssl工具集
+  copy: 
+    src: "{{ item.src }}"
+    dest: /usr/bin/{{ item.dest }}
+    owner: root
+    group: root
+    force: yes    
+    mode: 0755
+  with_items:
+    - { src: "files/cfssl", dest: 'cfssl' }
+    - { src: "files/cfssljson", dest: 'cfssljson' }
+    - { src: "files/cfssl-certinfo", dest: 'cfssl-certinfo' }
+  when: ( hostname.stdout == 'k8s-master01' )    
+- name: 在{{ inventory_hostname }}初始化cfssl
+  shell: "cd /usr/local/src;cfssl print-defaults config > config.json;cfssl print-defaults csr > csr.json"
+  ignore_errors: yes
+  when: ( hostname.stdout == 'k8s-master01' )    
+- name: 在{{ inventory_hostname }}生成证书
+  shell: cd /usr/local/src && sh create-ca.sh
+  when: ( hostname.stdout == 'k8s-master01' )    
+- name: 生成的证书同步到ansible主控机{{ inventory_hostname }}目录:roles/ca/ssl下
+  fetch:
+    src: "{{ item }}"
+    dest: 'roles/ca/ssl/'
+  with_fileglob:
+    - '/usr/local/src/etcd*.pem'
+    - '/usr/local/src/ca.pem'
+    - '/usr/local/src/ca-key.pem' 
+    - '/usr/local/src/ca-config.json'
+    - '/usr/local/src/admin*.pem'
+    - '/usr/local/src/flanneld*.pem'
+    - '/usr/local/src/kube-*.pem'
+    - '/usr/local/src/kubernetes*.pem'
+  when: ( hostname.stdout == 'k8s-master01' )
+- name: 在{{ inventory_hostname }}上分发证书到其他master节点
+  copy:
+    src: "{{ item }}"
+    dest: /opt/kubernetes/ssl/
+    mode: 0755
+  with_fileglob:
+    - 'ssl/k8s-master01/usr/local/src/etcd*.pem'
+    - 'ssl/k8s-master01/usr/local/src/ca.pem'
+    - 'ssl/k8s-master01/usr/local/src/ca-key.pem' 
+    - 'ssl/k8s-master01/usr/local/src/ca-config.json'
+    - 'ssl/k8s-master01/usr/local/src/admin*.pem'        
+    - 'ssl/k8s-master01/usr/local/src/kube-controller-manager*.pem'
+    - 'ssl/k8s-master01/usr/local/src/kube-scheduler*.pem'
+    - 'ssl/k8s-master01/usr/local/src/kubernetes*.pem'
+    - 'ssl/k8s-master01/usr/local/src/flanneld*.pem'
+  when: ( hostname.stdout == 'k8s-master01' or hostname.stdout == 'k8s-master02' or hostname.stdout == 'k8s-master03' )
+- name: 在{{ inventory_hostname }}上分发证书到其他work节点
+  copy:
+    src: "{{ item }}"
+    dest: /opt/kubernetes/ssl/
+    mode: 0755
+    register: result
+  with_fileglob:
+    - 'ssl/k8s-master01/usr/local/src/ca.pem'
+    - 'ssl/k8s-master01/usr/local/src/ca-key.pem' 
+    - 'ssl/k8s-master01/usr/local/src/kube-proxy*.pem'
+    - 'ssl/k8s-master01/usr/local/src/flanneld*.pem'
+  when: 
+    - hostname.stdout != 'k8s-master01'
+    - hostname.stdout != 'k8s-master02'
+    - hostname.stdout != 'k8s-master03'
+- name: 清除收集的证书
+  file:
+    path: "{{ item }}"
+    state: absent
+    force: yes
+  with_fileglob:
+    - 'ssl/k8s-master01/usr/local/src/etcd*.pem'
+    - 'ssl/k8s-master01/usr/local/src/ca.pem'
+    - 'ssl/k8s-master01/usr/local/src/ca-key.pem'
+    - 'ssl/k8s-master01/usr/local/src/ca-config.json'
+    - 'ssl/k8s-master01/usr/local/src/admin*.pem'
+    - 'ssl/k8s-master01/usr/local/src/flanneld*.pem'
+    - 'ssl/k8s-master01/usr/local/src/kube-*.pem'
+    - 'ssl/k8s-master01/usr/local/src/kubernetes*.pem'
+  when: 
+    - result.rc == 0
+    - hostname.stdout == 'k8s-master01'

@@ -1,0 +1,22 @@
+[k8s-all]
+k8s-master01 ansible_ssh_host=172.16.2.198
+k8s-master02 ansible_ssh_host=172.16.2.41
+k8s-master03 ansible_ssh_host=172.16.2.79
+k8s-node01  ansible_ssh_host=172.16.2.30
+k8s-node02  ansible_ssh_host=172.16.2.134
+[k8s-master]
+k8s-master01 ansible_ssh_host=172.16.2.198
+k8s-master02 ansible_ssh_host=172.16.2.41
+k8s-master03 ansible_ssh_host=172.16.2.79
+[k8s-node]
+k8s-node01  ansible_ssh_host=172.16.2.30
+k8s-node02  ansible_ssh_host=172.16.2.134
+[etcd-all]
+etcd-node1  ansible_ssh_host=172.16.2.198
+etcd-node2  ansible_ssh_host=172.16.2.41
+etcd-node3  ansible_ssh_host=172.16.2.79
+[k8s-all:vars]
+ansible_ssh_user=root 
+ansible_ssh_pass=hundun@123.
+ansible_ssh_port=22
+

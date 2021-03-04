@@ -1,0 +1,12 @@
+{
+"data-root":"{{ DOCKER_DATA_DIR }}",
+"registry-mirrors": ["https://ebcik8gv.mirror.aliyuncs.com"],
+"iptables": true,
+"storage-driver": "overlay2", 
+"storage-opts": ["overlay2.override_kernel_check=true"],
+"dns": ["{{ DNS1 }}", "{{ DNS2 }}"],
+"log-driver":"json-file",
+"log-opts": {"max-size":"100m", "max-file":"3"},
+"live-restore": true,
+"exec-opts": ["native.cgroupdriver=systemd"]
+}

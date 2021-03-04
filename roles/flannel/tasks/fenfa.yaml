@@ -1,0 +1,25 @@
+---
+- name: 创建flannel目录
+  file:
+    path: /opt/kubernetes/flannel
+    state: directory
+
+- name: 解压flannel
+  unarchive:
+    src: files/flannel-v0.11.0-linux-amd64.tar.gz
+    dest: /usr/local/src/
+
+- name: 分发flanneld 二进制文件到集群所有节点
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: 0755
+  with_items:
+    - { src: '/usr/local/src/flanneld', dest: '/opt/kubernetes/bin/flanneld' }
+    - { src: '/usr/local/src/mk-docker-opts.sh', dest: '/opt/kubernetes/bin/mk-docker-opts.sh' }
+
+- name: 向etcd写入集群Pod网段信息
+  shell: |
+    etcdctl --endpoints={{ ETCD_ENDPOINTS }} --ca-file=/opt/kubernetes/ssl/ca.pem --cert-file=/opt/kubernetes/ssl/flanneld.pem --key-file=/opt/kubernetes/ssl/flanneld-key.pem set /kubernetes/network/config '{"Network":"'{{ CLUSTER_CIDR }}'", "SubnetLen": 21, "Backend": {"Type": "vxlan","DirectRouting": true}}'
+  when: inventory_hostname  == "k8s-master01"
+

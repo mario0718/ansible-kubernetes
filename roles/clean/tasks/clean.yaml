@@ -1,0 +1,14 @@
+---
+- name: 在work节点上清除kubectl,kubeadm文件
+  file:
+    path: "{{ item.path }}{{ item.file }}"
+    state: absent
+    force: yes
+  with_items:
+    - { path: '/opt/kubernetes/bin/',file: 'kubectl' }
+    - { path: '/opt/kubernetes/bin/',file: 'kubeadm' }
+    - { path: '/root/.kube/',file: '' }
+  when: 
+    - inventory_hostname != 'k8s-master01'
+    - inventory_hostname != 'k8s-master02'
+    - inventory_hostname != 'k8s-master03'

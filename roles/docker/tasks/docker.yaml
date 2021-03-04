@@ -1,0 +1,136 @@
+---
+- name: CentOS7_base
+  yum_repository:
+    name: base
+    baseurl: https://mirrors.aliyun.com/centos/7/os/x86_64/
+    enabled: yes
+    gpgcheck: no
+    mode: 0644
+    file: base
+    description: base
+    state: present
+  when:
+    - ansible_facts["distribution"] == "CentOS"
+    - ansible_facts["distribution_major_version"] == "7"
+
+- name: CentOS7_epel
+  yum_repository:
+    name: epel
+    description: EPEL YUM repo
+    file: epel
+    baseurl: https://mirrors.aliyun.com/epel/7/x86_64
+    gpgcheck: no
+    mode: 0644
+    state: present
+  when:
+    - ansible_facts["distribution"] == "CentOS"
+    - ansible_facts["distribution_major_version"] == "7"  
+
+- name: 判断docker进程是否存在
+  shell: "ps -ef|grep dockerd|grep -v 'grep' 2>/dev/null"
+  ignore_errors: True
+  register: result
+- name: "在docker进程中查找dockerd命令"
+  debug:
+    msg: "docker is running"
+  when: result.stdout.find('/usr/bin/dockerd') != -1  
+- name: "yum安装yum-utils device-mapper-persistent-data lvm2"
+  yum: 
+    name: "{{ item }}" 
+    state: latest
+  loop:
+    - yum-utils
+    - device-mapper-persistent-data
+    - lvm2 
+    - deltarpm
+  when: result.stdout.find('/usr/bin/dockerd') == -1
+      
+- name: "增加docker的官方源"
+  copy:
+    src: files/docker-ce.repo
+    dest: /etc/yum.repos.d/
+    mode: 0755
+  when: result.stdout.find('/usr/bin/dockerd') == -1
+- name: containerd和docker安装包同步
+  copy:
+    src: "{{ item }}"
+    dest: /usr/local/src/
+    mode: 0755
+  with_fileglob:
+    - 'files/rpm/containerd.io*.x86_64.rpm'
+    - 'files/rpm/docker-ce*.x86_64.rpm'
+
+- name: "在线yum安装docker-ce-18.09.9-3.el7"
+  yum: 
+    name: "{{ item }}"
+    state: present
+  loop:
+    - '/usr/local/src/containerd.io-1.4.3-3.1.el7.x86_64.rpm'
+    - '/usr/local/src/docker-ce-18.09.9-3.el7.x86_64.rpm'
+    - '/usr/local/src/docker-ce-cli-20.10.4-3.el7.x86_64.rpm'     
+  when: result.stdout.find('/usr/bin/dockerd') == -1 
+
+- name: "sysctl参数设置:net.ipv4.ip_forward=1" 
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+    sysctl_set: yes
+  when: result.stdout.find('/usr/bin/dockerd') == -1
+- name: "判断是否安装iptables"
+  shell: ls -l /etc/sysconfig/iptables 2>/dev/null
+  ignore_errors: true
+  register: status    
+- name: "sysctl参数设置:net.bridge.bridge-nf-call-iptables=1"
+  sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: '1'
+    state: present
+    reload: yes
+    sysctl_set: yes
+  when: "'ok' in status.stdout" 
+- name: "sysctl参数设置:net.bridge.bridge-nf-call-ip6tables=1"
+  sysctl:
+    name: net.bridge.bridge-nf-call-ip6tables
+    value: '1'
+    state: present
+    reload: yes
+    sysctl_set: yes
+  when: "'ok' in status.stdout"
+- name: "创建docker目录"
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - /etc/docker
+    - "{{ DOCKER_DATA_DIR }}"
+  when: result.stdout.find('/usr/bin/dockerd') == -1 
+- name: "复制docker配置文件"
+  template: 
+    src: daemon.json.j2 
+    dest: /etc/docker/daemon.json
+    mode: 0755
+  when: result.stdout.find('/usr/bin/dockerd') == -1    
+- name: "分发service文件"
+  copy: 
+    src: files/docker.service
+    dest: /usr/lib/systemd/system
+    mode: 0755
+  when: result.stdout.find('/usr/bin/dockerd') == -1
+
+- name: 关闭iptable服务
+  shell: |
+    /usr/sbin/iptables -F && /usr/sbin/iptables -X && /usr/sbin/iptables -F -t nat && /usr/sbin/iptables -X -t nat && /usr/sbin/iptables -P FORWARD ACCEPT
+
+- name: 启动docker服务
+  systemd:
+    name: docker
+    state: restarted
+    enabled: yes
+    daemon_reload: yes
+  when: result.stdout.find('/usr/bin/dockerd') == -1
+- name: "docker 启动状态"
+  shell: docker info
+  register: docker
+- debug: var=docker.stdout_lines
